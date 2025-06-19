@@ -1,0 +1,40 @@
+# 忽略各级目录下的 draft 文件夹及其内容
+**/draft/
+
+# 忽略编辑器/IDE 相关文件
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# 忽略系统隐藏文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 忽略日志与构建输出
+logs/
+log/
+*.log
+tmp/
+temp/
+dist/
+build/
+
+# 忽略环境配置文件（如有）
+.env
+.env.local
+*.env.*
+
+# 忽略备份文件（以 ~ 结尾）
+*~
+
+# 忽略特定平台缓存目录
+Cache/
+cache/
+
+# 忽略测试目录下的内容
+**/test
+test
