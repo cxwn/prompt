@@ -1,4 +1,4 @@
-# CILMS进程与日志管理系统开发提
+# CILMS进程与日志管理系统开发
 
 ## 1. 角色定义
 
@@ -20,7 +20,7 @@
 
 - **容器模式（PID 1）**
 
-  - **前台模式**（默认）: CILMS启动所有被管理的进程后，自身仍作为容器1号进程持续运行，阻止容器退出；
+  - **前台模式**（默认）: CILMS启动所有被管理的进程后，自身仍作为容器1号进程持续前台运行，阻止容器退出；
   - **后台模式**（`-d`）: CILMS启动所有子进程后转入后台，不主动阻止容器退出。
   
 - **非容器模式**
@@ -136,20 +136,20 @@ cilms list [--all|--pid PID]
 # 日志查看
 cilms logs [--follow] [--number NUM]
 
-# 僵尸进程管理
+# 僵尸进程管理，如直接执行重启则需首先完成僵尸进程清理后再执行重启操作。
 cilms zombies [--clean] [--restart]
 
-# 孤儿进程管理  
+# 孤儿进程管理，如直接执行重启则需首先完成孤儿进程清理后再执行重启操作。  
 cilms orphans [--clean] [--restart]
 ```
 
 #### 4.1.2 参数说明
 
-- `--daemon`: 守护进程模式运行
-- `--port`: HTTP监听端口（默认10168）
-- `--config`: 配置文件路径（默认/etc/cilms/cilms.yaml）
-- `--follow`: 实时跟踪日志输出
-- `--number`: 显示日志行数（默认100）
+- `--daemon`，`-d`: 守护进程模式运行，不指定此项则以前台模式运行
+- `--port`，`-p`: HTTP监听端口（默认10168）
+- `--config`，`-c`: 配置文件路径（默认/etc/cilms/cilms.yaml）
+- `--follow`，`-f`: 实时跟踪日志输出
+- `--number`，`-n`: 显示日志行数（默认100）
 
 ### 4.2 HTTP API接口
 
@@ -220,9 +220,11 @@ processes:
     environment:
       enable: true               # 是否启用该进程
       variables:                 # 环境变量配置
-        - name: "VAR_NAME"       # 环境变量名称
-          value: "var_value"     # 环境变量值
-    dependsOn: []                # 依赖进程列表
+        - name: "VAR_NAME"       # 环境变量1名称
+          value: "var_value"     # 环境变量1值
+        - name: "APP_PORT"       # 环境变量2名称
+          value: "8080"          # 环境变量2值  
+    dependsOn: []                # 依赖进程列表，空表示无依赖
     directory: "/cilms/app"      # 工作目录
     command: "app"               # 可执行文件
     args: ["-p", "${APP_PORT}"]  # 命令行参数（支持环境变量替换）
@@ -237,7 +239,7 @@ processes:
       maxDays: 7                   #  保留天数
       maxBackups: 5                # 保留历史文件数
       compress: true               # 是否压缩
-      checkInterval: 60            # 日志轮转检查周期，默认60秒
+      checkInterval: 60            # 日志轮转检查周期，默认60秒，预留接口，暂不支持
   - name: "demo"
       environment: 
         enable: true
@@ -249,7 +251,7 @@ processes:
       dependsOn: [ "app" ] 
       directory: "/cilms/demo"
       command: "demo"
-      args: ["--port", "${PORT}", "--db-host", "${DB_HOST}"]
+      args: ["--port", "${PORT}", "--db-host", "${DB_HOST}"] # 启动参数支持环境变量替换
       priority: 0 
       restartPolicy: "always" 
       maxRetries: 5 
@@ -295,11 +297,11 @@ processes:
 
 ### 7.2 代码组织结构（可根据实际情况进行扩展，不要过渡发挥）
 
-```text
+```plaintext
 cilms/
 ├── bin/                           # 编译结果输出目录
 ├── cmd/
-│   ├── start.go                   # 启动命令入口，具体实现在cli/commands.go
+│   ├── start.go                   # 启动命令入口，具体实现在cli/commands.go，系统启动时启动http服务
 │   ├── stop.go                    # 停止命令入口，具体实现在cli/commands.go
 │   ├── restart.go                 # 重启命令入口，具体实现在cli/commands.go
 │   ├── list.go
@@ -311,10 +313,18 @@ cilms/
 │   │   └── server.go
 │   ├── cli
 │   │   └── commands.go             # 命令行接口主要实现函数
+│   ├── core/
+│   │   ├── start.go                # 启动进程核心实现，供cli/commands.go，api/server.go调用
+│   │   ├── stop.go                 # 停止进程核心实现，供cli/commands.go，api/server.go调用
+│   │   ├── restart.go              # 重启进程核心实现，供cli/commands.go，api/server.go调用
+│   │   ├── list.go                 # 进程列表核心实现，供cli/commands.go，api/server.go调用
+│   │   ├── zombies.go              # 僵尸进程管理核心实现，供cli/commands.go，api/server.go调用
+│   │   ├── orphans.go              # 孤儿进程管理核心实现，供cli/commands.go，api/server.go调用
+│   │   └── logs.go                 # 日志管理核心实现，供cli/commands.go，api/server.go调用
 │   ├── process/                    # 核心业务逻辑
 │   │   ├── manager.go              # 进程管理器
 │   │   ├── process.go              # 进程定义和状态
-│   │   ├── monitor.go              # 进程监控
+│   │   ├── monitor.go              # 进程监控相关
 │   │   └── dependency.go           # 依赖管理
 │   ├── config/                     # 配置管理
 │   │   ├── config.go               # 全局加载一次，在读取命令行入参或配置文件值时，使用默认值进行初始化
@@ -323,12 +333,20 @@ cilms/
 │   │   ├── logger.go               # 配置管理初始化后，使用配置管理初始化后的配置进行初始化，全局初始化一次，线程安全
 │   │   └── rotator.go              # 日志轮转
 │   └── utils/                      # 工具函数
-│       ├── signal.go
-│       ├── pid.go
-│       └── daemon.go
+│       ├── signal.go               # 信号处理
+│       ├── pid.go                  # 进程ID管理
+│       └── daemon.go               # 守护进程工具，直接参考仓库 https://github.com/VividCortex/godaemon.git 实现相关功能
 ├── pkg/                            # 对外暴露的包
-├── configs/
+├── examples/                       # 示例配置文件和使用案例
+|   ├── start/                      # 启动示例
+│   ├── restart/                    # 重启示例
+|   ├── stop/                       # 停止示例
+|   ├── list/                       # 列表示例
+|   ├── zombies/                    # 僵尸进程示例
+|   ├── orphans/                    # 孤儿进程示例
+|   └── logs/                       # 日志示例
 │   └── cilms.yaml                  # 示例配置文件
+|── mocks/                          # 模拟被管理的进程及相关数据                        # 构建、演示脚本
 ├── scripts/               # 构建、演示脚本
 ├── docs/                  # 架构图、流程图、时序图及其他文档
 ├── go.mod
@@ -346,4 +364,4 @@ cilms/
 - **设计理念**: 参考supervisord的设计思想，但针对容器环境优化;
 - **最佳实践**: 遵循Go语言和Linux系统编程最佳实践。
 
-**注意**: 实现时请确保每个功能模块都有清晰的接口定义和完整的错误处理机制。代码应当具备良好的可读性、可维护性和可扩展性。对于任何来自没有同行评审机制或者原始的来源的代码，应该仔核实、验证，确保代码逻辑正确、可运行。一次性输出所有交付内容。
+**注意**: 实现时请确保每个功能模块都有清晰的接口定义和完整的错误处理机制，严格按照设计文档进行编码。代码应当具备良好的可读性、可维护性和可扩展性。对于任何来自没有同行评审机制或者原始的来源的代码，应该仔核实、验证，确保代码逻辑正确、可运行。一次性输出所有交付内容。
