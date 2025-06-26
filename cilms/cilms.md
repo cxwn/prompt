@@ -361,7 +361,7 @@ cilms/
 
 ## 8. 参考资源
 
-- **开源项目**: <https://github.com/Supervisor/supervisor.git>，<https://github.com/ochinchina/supervisord.git>，从以上仓库获取灵感，但不要简单复制代码。您的实现应具有原创性，并针对本项目的特定需求进行定制。
+- **开源项目**: <https://github.com/Supervisor/supervisor.git>，<https://github.com/ochinchina/supervisord.git>，从以上仓库获取灵感，但不要简单复制代码。您的实现应具有原创性，并针对本项目的特定需求进行定制；
 - **设计理念**: 参考supervisord的设计思想，但针对容器环境优化;
 - **最佳实践**: 遵循Go语言和Linux系统编程最佳实践。
 
