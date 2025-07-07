@@ -24,3 +24,21 @@ A complete collection of my project.
 | `move` / `mv`   | 移动或重命名文件                              | `mv: move old-notes.md to archive/old-notes.md`    |
 
 **特别说明**：本仓库中涉及到的提示词可能少部分来源于互联网，暂未找到出处，如有雷同，请及时与我取得联系进一步处理。
+
+结构化提示词的各模块：
+
+```markdown
+# Role: <name> : 指定角色会让 GPT 聚焦在对应领域进行信息输出
+
+## Profile author/version/description : Credit 和 迭代版本记录
+
+## Goals: 一句话描述 Prompt 目标, 让 GPT Attention 聚焦起来
+
+## Constrains: 描述限制条件, 其实是在帮 GPT 进行剪枝, 减少不必要分支的计算
+
+## Skills: 描述技能项, 强化对应领域的信息权重
+
+## Workflow: 重点中的重点, 你希望 Prompt 按什么方式来对话和输出
+
+## Initialization: 冷启动时的对白, 也是一个强调需注意重点的机会
+```

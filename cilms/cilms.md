@@ -98,8 +98,8 @@
 - 时间格式: 2023-08-01 20:00:00.000
 - 日志信息以纯英语呈现，代码中不要出现过多空行
 - 级别宽度: 固定5字符左对齐 [DEBUG|INFO |WARN |ERROR|FATAL]
-- 模板: {时间} {级别} {PID} {文件}:{行号} {消息}
-- 示例: 2023-08-01 20:00:00.000 INFO  1234 cilms/main.go:100 系统启动完成
+- 模板: {时间} {级别} {文件名}:{行号} {消息}
+- 示例: 2023-08-01 20:00:00.000 INFO cilms/main.go:100 系统启动完成
 
 #### 3.3.2 输出配置
 
@@ -193,8 +193,8 @@ POST   /cilms/orphans/clean         # 清理孤儿进程
 ### 5.1 技术栈要求
 
 - **语言版本**: Go 1.24.2
-- **CLI框架**: urfave/cli/v2
-- **日志库**: logrus
+- **CLI框架**: cobra
+- **日志库**: zap
 - **日志轮转**: lumberjack.v2
 - **HTTP框架**: gin-gonic/gin
 - **配置解析**: gopkg.in/yaml.v3
@@ -225,7 +225,7 @@ processes:
         - name: "APP_PORT"       # 环境变量2名称
           value: "8080"          # 环境变量2值  
     dependsOn: []                # 依赖进程列表，空表示无依赖
-    directory: "/cilms/app"      # 工作目录
+    workdir: "/cilms/app"      # 工作目录
     command: "app"               # 可执行文件
     args: ["-p", "${APP_PORT}"]  # 命令行参数（支持环境变量替换）
     priority: 0                  # 启动优先级(数值越小优先级越高)
@@ -249,7 +249,7 @@ processes:
           - name: "DB_HOST"
             value: "localhost"
       dependsOn: [ "app" ] 
-      directory: "/cilms/demo"
+      workdir: "/cilms/demo"
       command: "demo"
       args: ["--port", "${PORT}", "--db-host", "${DB_HOST}"] # 启动参数支持环境变量替换
       priority: 0 
@@ -265,7 +265,7 @@ processes:
 ### 6.1 代码质量标准
 
 - **架构设计**: 提供系统架构图和主要流程图;
-- **模块划分**: CLI和HTTP接口独立实现，不交叉调用;
+- **模块划分**: CLI和HTTP接口独立实现，调用core包的函数，不交叉调用;
 - **错误处理**: 完善的错误处理和异常恢复机制;
 - **并发安全**: 使用sync包确保并发安全;
 - **单元测试**: 核心功能提供单元测试;
@@ -318,7 +318,7 @@ cilms/
 │   │   ├── stop.go                 # 停止进程核心实现，供cli/commands.go，api/server.go调用
 │   │   ├── restart.go              # 重启进程核心实现，供cli/commands.go，api/server.go调用
 │   │   ├── list.go                 # 进程列表核心实现，供cli/commands.go，api/server.go调用
-│   │   ├── zombies.go              # 僵尸进程管理核心实现，供cli/commands.go，api/server.go调用
+│   │   ├── zombies.go              # 僵尸进程管理核心实现，具体实现可参考仓库 <https://github.com/ramr/go-reaper.git>，供cli/commands.go，api/server.go调用
 │   │   ├── orphans.go              # 孤儿进程管理核心实现，供cli/commands.go，api/server.go调用
 │   │   └── logs.go                 # 日志管理核心实现，供cli/commands.go，api/server.go调用
 │   ├── process/                    # 核心业务逻辑
@@ -335,7 +335,7 @@ cilms/
 │   └── utils/                      # 工具函数
 │       ├── signal.go               # 信号处理
 │       ├── pid.go                  # 进程ID管理
-│       └── daemon.go               # 守护进程工具，直接参考仓库 https://github.com/VividCortex/godaemon.git 实现相关功能
+│       └── daemon.go               # 守护进程工具，直接参考仓库 <https://github.com/sevlyar/go-daemon.git> 实现相关功能
 ├── pkg/                            # 对外暴露的包
 ├── examples/                       # 示例配置文件和使用案例
 |   ├── start/                      # 启动示例
