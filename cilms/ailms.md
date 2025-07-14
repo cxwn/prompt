@@ -1,12 +1,12 @@
-# CILMS进程与日志管理系统开发
+# AILMS进程与日志管理系统开发
 
 ## 1. 角色定义
 
-你是一名资深的Go语言开发工程师，专精于Linux系统编程、进程管理、日志管理和容器技术。你需要设计并实现一个高性能、高可靠性的进程与日志管理工具。
+你是一名资深的Go语言开发工程师，专精于Linux系统编程、进程管理、日志管理和容器技术。你需要设计并实现一个高性能、高可靠性的进程与日志管理系统。该系统进程管理模块主要用于管理一组有启动顺序要求、进程有依赖关系的进程，并提供进程监控、异常处理、重启策略等功能。日志管理模块主要用于解决被管理的进程因历史原因无日志轮转、备份策略等功能问题。
 
 ## 2. 项目概述
 
-**项目名称**: CILMS (Container Initialization and Log Management System)。  
+**项目名称**: AILMS (Application Initialization and Log Management System)。  
 **核心目标**: 开发一款适用于Linux容器环境和非容器环境下通用的进程与日志管理工具。  
 **技术要求**: 使用Go 1.24.2实现，在容器环境下支持作为容器1号进程或守护进程运行。
 **开发环境**: windows 10专业版，已开启WSL2，Linux发行版为Ubuntu-24.04，已安装Docker 27.2.1，测试容器openanolis/anolisos:8.6已拉取至本地。
@@ -20,20 +20,20 @@
 
 - **容器模式（PID 1）**
 
-  - **前台模式**（默认）: CILMS启动所有被管理的进程后，自身仍作为容器1号进程持续前台运行，阻止容器退出；
-  - **后台模式**（`-d`）: CILMS启动所有子进程后转入后台，不主动阻止容器退出。
+  - **前台模式**（默认）: AILMS启动所有被管理的进程后，自身仍作为容器1号进程持续前台运行，阻止容器退出；
+  - **后台模式**（`-d`）: AILMS启动所有子进程后转入后台，不主动阻止容器退出。
   
 - **非容器模式**
 
-  - **前台模式**（默认）: CILMS阻塞当前终端，显示实时日志；
-  - **守护模式**（`-d`）: CILMS作为守护进程在后台运行，不阻塞终端。
+  - **前台模式**（默认）: AILMS阻塞当前终端，显示实时日志；
+  - **守护模式**（`-d`）: AILMS作为守护进程在后台运行，不阻塞终端。
 
-**注意：**容器和非容器环境下，CILMS均可以root或其他用户身份运行。
+**注意：**容器和非容器环境下，AILMS均可以root或其他用户身份运行。
 
 #### 3.1.2 进程启动策略
 
 - **优先级排序**: 按配置文件中的priority字段升序启动（数值越小优先级越高），相同优先级按配置文件顺序。
-- **root用户启动**：除被管理的进程要求root权限外，CILMS不要求以root用户启动。
+- **root用户启动**：除被管理的进程要求root权限外，AILMS不要求以root用户启动。
 - **依赖管理**
   - 进程启动前必须等待其`dependsOn`中列出的所有进程启动成功、状态正常；
   - 依赖检查基于进程名称，不区分同名进程实例；
@@ -77,8 +77,8 @@
 
 - 进程连续稳定运行超过600秒（10分钟）后，重启计数器归零；
 - 重启计数器达到maxRetries上限后的处理：
-  - 容器环境：CILMS（PID 1）退出，导致容器停止；
-  - 非容器环境：CILMS进程退出，停止管理所有子进程。
+  - 容器环境：AILMS（PID 1）退出，导致容器停止；
+  - 非容器环境：AILMS进程退出，停止管理所有子进程。
 
 #### 3.2.3 优雅停止机制
 
@@ -93,13 +93,15 @@
 
 #### 3.3.1 系统日志
 
-格式规范:
+需具备线程隔离功能，即：日志线程和业务线程拆分。如磁盘满时，日志无法输出，如果未做线程拆分将造成线程阻塞，影响业务线程。
+
+日志格式规范:
 
 - 时间格式: 2023-08-01 20:00:00.000
 - 日志信息以纯英语呈现，代码中不要出现过多空行
 - 级别宽度: 固定5字符左对齐 [DEBUG|INFO |WARN |ERROR|FATAL]
 - 模板: {时间} {级别} {文件名}:{行号} {消息}
-- 示例: 2023-08-01 20:00:00.000 INFO cilms/main.go:100 系统启动完成
+- 示例: 2023-08-01 20:00:00.000 INFO ailms/main.go:100 系统启动完成
 
 #### 3.3.2 输出配置
 
@@ -110,8 +112,8 @@
 
 #### 3.3 日志轮转(被管理的子进程的日志及自身日志轮转)
 
-- **系统日志轮转**: CILMS系统自身的日志文件基于已存在文件大小和时间的自动轮转；
-- **应用日志轮转**: 管理受控进程的日志文件轮转。如开启轮转，但需轮转的文件不存在，则日志输出错误信息；；
+- **系统日志轮转**: AILMS系统自身的日志文件基于已存在文件大小和时间的自动轮转；
+- **应用日志轮转**: 管理受控进程的日志文件轮转。如开启轮转，但需轮转的文件不存在，则日志输出错误信息；
 - **压缩归档**: 支持历史日志压缩存储。
 
 ## 4. 接口设计规范
@@ -121,33 +123,33 @@
 #### 4.1.1 主命令
 
 ```bash
-# 启动CILMS服务
-cilms start [-d|--daemon] [-p|--port PORT] [-c|--config FILE]
+# 启动AILMS服务
+ailms start [-d|--daemon] [-p|--port PORT] [-c|--config FILE]
 
-# 停止被管理的进程，最终停止CILMS服务  
-cilms stop
+# 停止被管理的进程，最终停止AILMS服务  
+ailms stop
 
-# 重启CILMS服务或重启指定PID进程
-cilms restart [--pid PID]
+# 重启AILMS服务或重启指定PID进程
+ailms restart [--pid PID]
 
 # 状态查询
-cilms list [--all|--pid PID]
+ailms list [--all|--pid PID]
 
 # 日志查看
-cilms logs [--follow] [--number NUM]
+ailms logs [--follow] [--number NUM]
 
 # 僵尸进程管理，如直接执行重启则需首先完成僵尸进程清理后再执行重启操作。
-cilms zombies [--clean] [--restart]
+ailms zombies [--clean] [--restart]
 
 # 孤儿进程管理，如直接执行重启则需首先完成孤儿进程清理后再执行重启操作。  
-cilms orphans [--clean] [--restart]
+ailms orphans [--clean] [--restart]
 ```
 
 #### 4.1.2 参数说明
 
 - `--daemon`，`-d`: 守护进程模式运行，不指定此项则以前台模式运行
 - `--port`，`-p`: HTTP监听端口（默认10168）
-- `--config`，`-c`: 配置文件路径（默认/etc/cilms/cilms.yaml）
+- `--config`，`-c`: 配置文件路径（默认/etc/ailms/ailms.yaml）
 - `--follow`，`-f`: 实时跟踪日志输出
 - `--number`，`-n`: 显示日志行数（默认100）
 
@@ -177,15 +179,15 @@ cilms orphans [--clean] [--restart]
 #### 4.2.2 API端点
 
 ```text
-GET    /cilms/processes              # 获取所有进程列表
-GET    /cilms/processes/{pid}        # 获取指定进程信息
-POST   /cilms/processes/{pid}/restart # 重启指定进程
-POST   /cilms/stop                   # 停止所有进程
-POST   /cilms/restart                # 重启所有进程
-GET    /cilms/zombies               # 获取僵尸进程列表
-POST   /cilms/zombies/clean         # 清理僵尸进程
-GET    /cilms/orphans               # 获取孤儿进程列表
-POST   /cilms/orphans/clean         # 清理孤儿进程
+GET    /ailms/processes              # 获取所有进程列表
+GET    /ailms/processes/{pid}        # 获取指定进程信息
+POST   /ailms/processes/{pid}/restart # 重启指定进程
+POST   /ailms/stop                   # 停止所有进程
+POST   /ailms/restart                # 重启所有进程
+GET    /ailms/zombies               # 获取僵尸进程列表
+POST   /ailms/zombies/clean         # 清理僵尸进程
+GET    /ailms/orphans               # 获取孤儿进程列表
+POST   /ailms/orphans/clean         # 清理孤儿进程
 ```
 
 ## 5. 技术规范
@@ -205,7 +207,7 @@ POST   /cilms/orphans/clean         # 清理孤儿进程
 global:
   port: 10168                    # HTTP监听端口
   logger:
-    file: "logs/cilms.log"       # 日志文件路径
+    file: "logs/ailms.log"       # 日志文件路径
     level: "info"                # 日志级别
     rotate: true                 # 启用日志轮转
     maxSize: 100                 # 单文件最大大小(MB)
@@ -225,7 +227,7 @@ processes:
         - name: "APP_PORT"       # 环境变量2名称
           value: "8080"          # 环境变量2值  
     dependsOn: []                # 依赖进程列表，空表示无依赖
-    workdir: "/cilms/app"      # 工作目录
+    workdir: "/ailms/app"      # 工作目录
     command: "app"               # 可执行文件
     args: ["-p", "${APP_PORT}"]  # 命令行参数（支持环境变量替换）
     priority: 0                  # 启动优先级(数值越小优先级越高)
@@ -249,7 +251,7 @@ processes:
           - name: "DB_HOST"
             value: "localhost"
       dependsOn: [ "app" ] 
-      workdir: "/cilms/demo"
+      workdir: "/ailms/demo"
       command: "demo"
       args: ["--port", "${PORT}", "--db-host", "${DB_HOST}"] # 启动参数支持环境变量替换
       priority: 0 
@@ -267,7 +269,7 @@ processes:
 - **架构设计**: 提供系统架构图和主要流程图;
 - **模块划分**: CLI和HTTP接口独立实现，调用core包的函数，不交叉调用;
 - **错误处理**: 完善的错误处理和异常恢复机制;
-- **并发安全**: 使用sync包确保并发安全;
+- **并发安全**: 使用sync包确保并发安全。日志和配置模块全局初始化一次，供其他模块调用；
 - **单元测试**: 核心功能提供单元测试;
 - **注释文档**: 以纯正英语进行注释，包括详尽的代码注释和文档说明。
 
@@ -298,7 +300,7 @@ processes:
 ### 7.2 代码组织结构（可根据实际情况进行扩展，不要过渡发挥）
 
 ```plaintext
-cilms/
+ailms/
 ├── bin/                           # 编译结果输出目录
 ├── cmd/
 │   ├── start.go                   # 启动命令入口，具体实现在cli/commands.go，系统启动时启动http服务
@@ -345,14 +347,14 @@ cilms/
 |   ├── zombies/                    # 僵尸进程示例
 |   ├── orphans/                    # 孤儿进程示例
 |   ├── logs/                       # 日志示例
-|   └── cilms/                      # 配置文件目录
-│       └── cilms.yaml              # 示例配置文件
+|   └── ailms/                      # 配置文件目录
+│       └── ailms.yaml              # 示例配置文件
 |── mocks/                          # 模拟被管理的进程及相关数据                        # 构建、演示脚本
 ├── scripts/               # 构建、演示脚本
 ├── docs/                  # 架构图、流程图、时序图及其他文档
 ├── go.mod
 ├── go.sum
-├── cilms.go               # 主程序入口
+├── ailms.go               # 主程序入口
 ├── Dockerfile
 ├── Makefile
 ├── README.md
@@ -365,4 +367,4 @@ cilms/
 - **设计理念**: 参考supervisord的设计思想，但针对容器环境优化;
 - **最佳实践**: 遵循Go语言和Linux系统编程最佳实践。
 
-**注意**: 实现时请确保每个功能模块都有清晰的接口定义和完整的错误处理机制，严格按照设计文档进行编码。代码应当具备良好的可读性、可维护性和可扩展性。对于任何来自没有同行评审机制或者原始的来源的代码，应该仔核实、验证，确保代码逻辑正确、可运行。一次性输出所有交付内容。
+**注意**: 实现时请确保每个功能模块都有清晰的接口定义和完整的错误处理机制，严格按照设计文档进行编码。代码应当具备良好的可读性、可维护性和可扩展性。对于任何来自没有同行评审机制或者原始的来源的代码，应该仔核实、验证，确保代码逻辑正确、可运行。上下文长度限制范围内，尽可能一次性输出所有交付内容，如无法一次性输出所有交付内容，则需输入“继续”指令后继续输出剩余内容，在上下文长度限制的情况下，尽量避免用户输入指令。
