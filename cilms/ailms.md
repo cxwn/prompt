@@ -8,7 +8,7 @@
 
 **项目名称**: AILMS (Application Initialization and Log Management System)。  
 **核心目标**: 开发一款适用于Linux容器环境和非容器环境下通用的进程与日志管理工具。  
-**技术要求**: 使用Go 1.24.6实现，在容器环境下支持作为容器1号进程或守护进程运行。
+**技术要求**: 使用Go 1.26.2实现，在容器环境下支持作为容器1号进程或守护进程运行。
 **开发环境**: windows 10专业版，已开启WSL2，Linux发行版为Ubuntu-24.04，已安装Docker 27.2.1，测试容器openanolis/anolisos:8.6已拉取至本地。
 **运行环境**: Linux系列容器及物理机、虚拟机，操作系统内核版本高于3.10。
 
@@ -36,6 +36,7 @@
 - **root用户启动**：除被管理的进程要求root权限外，AILMS不要求以root用户启动。
 - **依赖管理**
   - 进程启动前必须等待其`dependsOn`中列出的所有进程启动成功、状态正常；
+  - **启动成功判定**：进程 PID 存在且连续存活超过 `startupGracePeriod`（默认3秒），即视为启动成功；
   - 依赖检查基于进程名称，不区分同名进程实例；
   - 如依赖的进程名有多个实例，需等待所有实例启动成功。
 - **同名进程启动控制**: 同名进程按优先级进行启动，如优先级相同，则按配置文件中出现的顺序依次启动。
@@ -110,13 +111,21 @@
 - **级别控制**: debug/info/warn/error/fatal五个级别;
 - **颜色支持**: 控制台输出支持颜色区分。
 
-#### 3.3 日志轮转(被管理的子进程的日志及自身日志轮转)
+### 3.3 日志轮转（被管理的子进程的日志及自身日志轮转）
 
 - **系统日志轮转**: AILMS系统自身的日志文件基于已存在文件大小和时间的自动轮转；
 - **应用日志轮转**: 管理受控进程的日志文件轮转。如开启轮转，但需轮转的文件不存在，则日志输出错误信息；
 - **压缩归档**: 支持历史日志压缩存储。
 
-## 4. 接口设计规范
+### 3.4 信号处理
+
+AILMS 自身的信号响应策略:
+
+- **SIGTERM / SIGINT**: 触发优雅停止流程——按启动优先级逆序依次停止所有被管理进程（每个进程先发 SIGTERM，超时后 SIGKILL），全部结束后 AILMS 自身退出；
+- **SIGHUP**: 重新加载配置文件，对新增进程执行启动，对已移除进程执行优雅停止，已有进程不重启；
+- **SIGCHLD**: 在作为 PID 1 运行时，负责回收所有子进程（包括孤儿进程的子进程），防止产生僵尸进程。
+
+
 
 ### 4.1 命令行接口
 
@@ -162,9 +171,10 @@ ailms orphans [--clean] [--restart]
   ```json
   {
     "status": 200,
-    "message": "Success", 
+    "message": "Success",
     "data": {}
   }
+  ```
 
 - 错误响应
 
@@ -184,6 +194,7 @@ GET    /ailms/processes/{pid}        # 获取指定进程信息
 POST   /ailms/processes/{pid}/restart # 重启指定进程
 POST   /ailms/stop                   # 停止所有进程
 POST   /ailms/restart                # 重启所有进程
+GET    /ailms/logs                   # 查看系统日志（支持 ?follow=true&number=100）
 GET    /ailms/zombies               # 获取僵尸进程列表
 POST   /ailms/zombies/clean         # 清理僵尸进程
 GET    /ailms/orphans               # 获取孤儿进程列表
@@ -195,11 +206,11 @@ POST   /ailms/orphans/clean         # 清理孤儿进程
 ### 5.1 技术栈要求
 
 - **语言版本**: Go 1.26.2
-- **CLI框架**: cobra
-- **日志库**: zap
-- **日志轮转**: lumberjack.v2
-- **HTTP框架**: gin-gonic/gin
-- **配置解析**: gopkg.in/yaml.v3
+- **CLI框架**: cobra v1.9.x
+- **日志库**: zap v1.27.x
+- **日志轮转**: lumberjack.v2 v2.2.x
+- **HTTP框架**: gin-gonic/gin v1.10.x
+- **配置解析**: gopkg.in/yaml.v3 v3.0.x
 
 ### 5.2 配置文件规范
 
@@ -219,13 +230,13 @@ global:
 
 processes:
   - name: "app"                  # 进程名称(可能重复)
+    enable: true                 # 是否启用该进程
     environment:
-      enable: true               # 是否启用该进程
       variables:                 # 环境变量配置
         - name: "VAR_NAME"       # 环境变量1名称
           value: "var_value"     # 环境变量1值
         - name: "APP_PORT"       # 环境变量2名称
-          value: "8080"          # 环境变量2值  
+          value: "8080"          # 环境变量2值
     dependsOn: []                # 依赖进程列表，空表示无依赖
     workdir: "/ailms/app"      # 工作目录
     command: "app"               # 可执行文件
@@ -233,6 +244,7 @@ processes:
     priority: 0                  # 启动优先级(数值越小优先级越高)
     restartPolicy: "always"      # 重启策略: always/onFailure/never
     maxRetries: 5                # 最大重试次数
+    startupGracePeriod: 3        # 判定启动成功所需的最短存活时间（秒，默认3秒）
     stopTimeout: 10              # 优雅停止超时时间（秒）
     logRotate:                   # 被启动进程日志轮转配置
       rotate: true               # 是否启动被管理进程的日志轮转
@@ -243,23 +255,23 @@ processes:
       compress: true               # 是否压缩
       checkInterval: 60            # 日志轮转检查周期，默认60秒，预留接口，暂不支持
   - name: "demo"
-      environment: 
-        enable: true
-        variables:
-          - name: "PORT"
-            value: "8080"
-          - name: "DB_HOST"
-            value: "localhost"
-      dependsOn: [ "app" ] 
-      workdir: "/ailms/demo"
-      command: "demo"
-      args: ["--port", "${PORT}", "--db-host", "${DB_HOST}"] # 启动参数支持环境变量替换
-      priority: 0 
-      restartPolicy: "always" 
-      maxRetries: 5 
-      stopTimeout: 10 
-      logRotate:
-        rotate: false  # 不启动被管理应用进程的日志轮转
+    enable: true
+    environment:
+      variables:
+        - name: "PORT"
+          value: "8080"
+        - name: "DB_HOST"
+          value: "localhost"
+    dependsOn: [ "app" ]
+    workdir: "/ailms/demo"
+    command: "demo"
+    args: ["--port", "${PORT}", "--db-host", "${DB_HOST}"] # 启动参数支持环境变量替换
+    priority: 0
+    restartPolicy: "always"
+    maxRetries: 5
+    stopTimeout: 10
+    logRotate:
+      rotate: false  # 不启动被管理应用进程的日志轮转
 ```
 
 ## 6. 实现要求
@@ -311,7 +323,7 @@ ailms/
 │   ├── orphans.go
 │   └── logs.go  
 ├── internal/
-│   ├── api/                        # HTTP API 实现，实际执行时调用cli/commands.go下主要实现函数
+│   ├── api/                        # HTTP API 实现，调用 core 包函数，与 cli 包平级、互不调用
 │   │   └── server.go
 │   ├── cli
 │   │   └── commands.go             # 命令行接口主要实现函数
